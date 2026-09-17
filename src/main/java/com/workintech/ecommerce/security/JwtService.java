@@ -3,11 +3,13 @@ package com.workintech.ecommerce.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+
 //JwtService → token üretir, email'i çıkarır, token'ı doğrular.
 //JwtAuthenticationFilter → gelen request'teki Authorization: Bearer ... token'ını yakalar ve kontrol eder.
 //CustomUserDetailsService → email üzerinden DB'deki kullanıcıyı Spring Security'ye tanıtır.
@@ -15,12 +17,16 @@ import java.util.Date;
 public class JwtService {
 
     // JWT'yi imzalamak için kullanılan gizli anahtar.
-    // Daha sonra application.properties / environment variable'a taşıyacağız.
-    private static final String SECRET_KEY =
-            "ecommerce-super-secret-jwt-key-2026-seda-project";
+    private final String secretKey;
 
     // Token 24 saat geçerli olacak.
     private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24;
+
+    public JwtService(
+            @Value("${jwt.secret}") String secretKey
+    ) {
+        this.secretKey = secretKey;
+    }
 
     // JWT oluşturur.
     public String generateToken(String email) {
@@ -72,7 +78,7 @@ public class JwtService {
     private SecretKey getSigningKey() {
 
         return Keys.hmacShaKeyFor(
-                SECRET_KEY.getBytes(StandardCharsets.UTF_8)
+                secretKey.getBytes(StandardCharsets.UTF_8)
         );
     }
 }

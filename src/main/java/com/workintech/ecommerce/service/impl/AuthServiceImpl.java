@@ -3,6 +3,7 @@ package com.workintech.ecommerce.service.impl;
 import com.workintech.ecommerce.dto.request.LoginRequest;
 import com.workintech.ecommerce.dto.request.SignupRequest;
 import com.workintech.ecommerce.dto.response.LoginResponse;
+import com.workintech.ecommerce.dto.response.UserResponse;
 import com.workintech.ecommerce.entity.Role;
 import com.workintech.ecommerce.entity.Store;
 import com.workintech.ecommerce.entity.User;
@@ -44,9 +45,10 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public User signup(SignupRequest request) {
 
-        String email = request.getEmail().trim().toLowerCase();
+        String email = request.getEmail()
+                .trim()
+                .toLowerCase();
 
-        // Aynı email ile tekrar kayıt olunamaz.
         if (userRepository.existsByEmail(email)) {
             throw new ApiException(
                     "Email already exists.",
@@ -54,12 +56,13 @@ public class AuthServiceImpl implements AuthService {
             );
         }
 
-        // Gönderilen role_id geçerli mi?
         Role role = roleRepository.findById(request.getRoleId())
-                .orElseThrow(() -> new ApiException(
-                        "Role not found.",
-                        HttpStatus.NOT_FOUND
-                ));
+                .orElseThrow(() ->
+                        new ApiException(
+                                "Role not found.",
+                                HttpStatus.NOT_FOUND
+                        )
+                );
 
         // Public signup üzerinden admin oluşturulamaz.
         if ("admin".equals(role.getCode())) {
@@ -69,17 +72,20 @@ public class AuthServiceImpl implements AuthService {
             );
         }
 
-        // Store rolünde mağaza bilgileri zorunlu.
-        if ("store".equals(role.getCode()) && request.getStore() == null) {
+        // Store rolü seçildiyse store bilgileri zorunludur.
+        if ("store".equals(role.getCode())
+                && request.getStore() == null) {
+
             throw new ApiException(
                     "Store information is required.",
                     HttpStatus.BAD_REQUEST
             );
         }
 
-        // Store varsa tax number benzersiz olmalı.
         if ("store".equals(role.getCode())
-                && storeRepository.existsByTaxNo(request.getStore().getTaxNo())) {
+                && storeRepository.existsByTaxNo(
+                request.getStore().getTaxNo()
+        )) {
 
             throw new ApiException(
                     "Tax number already exists.",
@@ -88,10 +94,11 @@ public class AuthServiceImpl implements AuthService {
         }
 
         User user = new User();
+
         user.setName(request.getName().trim());
         user.setEmail(email);
 
-        // Şifreyi BCrypt ile hashleyerek kaydediyoruz.
+        // Şifre veritabanına BCrypt hash olarak kaydedilir.
         user.setPassword(
                 passwordEncoder.encode(request.getPassword())
         );
@@ -100,15 +107,27 @@ public class AuthServiceImpl implements AuthService {
 
         User savedUser = userRepository.save(user);
 
-        // Store kullanıcısıysa mağaza kaydını da oluştur.
+        // Store kullanıcısıysa mağaza bilgilerini de kaydet.
         if ("store".equals(role.getCode())) {
 
             Store store = new Store();
 
-            store.setName(request.getStore().getName().trim());
-            store.setPhone(request.getStore().getPhone());
-            store.setTaxNo(request.getStore().getTaxNo());
-            store.setBankAccount(request.getStore().getBankAccount());
+            store.setName(
+                    request.getStore().getName().trim()
+            );
+
+            store.setPhone(
+                    request.getStore().getPhone()
+            );
+
+            store.setTaxNo(
+                    request.getStore().getTaxNo()
+            );
+
+            store.setBankAccount(
+                    request.getStore().getBankAccount()
+            );
+
             store.setUser(savedUser);
 
             storeRepository.save(store);
@@ -120,31 +139,57 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginResponse login(LoginRequest request) {
 
-        String email = request.getEmail().trim().toLowerCase();
+        String email = request.getEmail()
+                .trim()
+                .toLowerCase();
 
-        // Kullanıcı email ile bulunur.
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ApiException(
-                        "Invalid email or password.",
-                        HttpStatus.UNAUTHORIZED
-                ));
+                .orElseThrow(() ->
+                        new ApiException(
+                                "Invalid email or password.",
+                                HttpStatus.UNAUTHORIZED
+                        )
+                );
 
-        // Girilen şifre BCrypt hash ile karşılaştırılır.
+        // Gönderilen şifre ile BCrypt hash karşılaştırılır.
         if (!passwordEncoder.matches(
                 request.getPassword(),
                 user.getPassword()
         )) {
+
             throw new ApiException(
                     "Invalid email or password.",
                     HttpStatus.UNAUTHORIZED
             );
         }
 
-        // Kullanıcı doğrulandıktan sonra JWT oluşturulur.
-        String token = jwtService.generateToken(user.getEmail());
+        String token =
+                jwtService.generateToken(user.getEmail());
 
         return new LoginResponse(
                 token,
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole().getId(),
+                user.getRole().getName()
+        );
+    }
+
+    @Override
+    public UserResponse verify(String email) {
+
+        User user = userRepository.findByEmail(
+                        email.trim().toLowerCase()
+                )
+                .orElseThrow(() ->
+                        new ApiException(
+                                "User not found.",
+                                HttpStatus.NOT_FOUND
+                        )
+                );
+
+        return new UserResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),

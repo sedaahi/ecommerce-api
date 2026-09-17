@@ -9,9 +9,8 @@ import com.workintech.ecommerce.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class AuthController {
@@ -47,7 +46,19 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request
     ) {
 
-        LoginResponse response = authService.login(request);
+        LoginResponse response =
+                authService.login(request);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/verify")
+    public ResponseEntity<UserResponse> verify(
+            Authentication authentication
+    ) {
+
+        UserResponse response =
+                authService.verify(authentication.getName());
 
         return ResponseEntity.ok(response);
     }
