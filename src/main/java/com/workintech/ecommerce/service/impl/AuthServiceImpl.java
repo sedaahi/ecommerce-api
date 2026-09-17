@@ -1,6 +1,8 @@
 package com.workintech.ecommerce.service.impl;
 
+import com.workintech.ecommerce.dto.request.LoginRequest;
 import com.workintech.ecommerce.dto.request.SignupRequest;
+import com.workintech.ecommerce.dto.response.LoginResponse;
 import com.workintech.ecommerce.entity.Role;
 import com.workintech.ecommerce.entity.Store;
 import com.workintech.ecommerce.entity.User;
@@ -8,6 +10,7 @@ import com.workintech.ecommerce.exception.ApiException;
 import com.workintech.ecommerce.repository.RoleRepository;
 import com.workintech.ecommerce.repository.StoreRepository;
 import com.workintech.ecommerce.repository.UserRepository;
+import com.workintech.ecommerce.security.JwtService;
 import com.workintech.ecommerce.service.AuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,27 +24,29 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final StoreRepository storeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     public AuthServiceImpl(
             UserRepository userRepository,
             RoleRepository roleRepository,
             StoreRepository storeRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.storeRepository = storeRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     @Override
     @Transactional
     public User signup(SignupRequest request) {
 
-        // Email'i standart hale getiriyoruz.
         String email = request.getEmail().trim().toLowerCase();
 
-        // Aynı email ile ikinci kez kayıt olunamaz.
+        // Aynı email ile tekrar kayıt olunamaz.
         if (userRepository.existsByEmail(email)) {
             throw new ApiException(
                     "Email already exists.",
@@ -49,14 +54,14 @@ public class AuthServiceImpl implements AuthService {
             );
         }
 
-        // Frontend'den gelen role_id gerçekten var mı?
+        // Gönderilen role_id geçerli mi?
         Role role = roleRepository.findById(request.getRoleId())
                 .orElseThrow(() -> new ApiException(
                         "Role not found.",
                         HttpStatus.NOT_FOUND
                 ));
 
-        // Kullanıcı signup üzerinden kendisini admin yapamaz.
+        // Public signup üzerinden admin oluşturulamaz.
         if ("admin".equals(role.getCode())) {
             throw new ApiException(
                     "Admin role cannot be selected during signup.",
@@ -64,7 +69,7 @@ public class AuthServiceImpl implements AuthService {
             );
         }
 
-        // Store rolü seçilmişse store bilgileri zorunlu.
+        // Store rolünde mağaza bilgileri zorunlu.
         if ("store".equals(role.getCode()) && request.getStore() == null) {
             throw new ApiException(
                     "Store information is required.",
@@ -72,10 +77,7 @@ public class AuthServiceImpl implements AuthService {
             );
         }
 
-        /*
-         * Store oluşturulacaksa tax number kontrolünü
-         * User kaydından önce yapıyoruz.
-         */
+        // Store varsa tax number benzersiz olmalı.
         if ("store".equals(role.getCode())
                 && storeRepository.existsByTaxNo(request.getStore().getTaxNo())) {
 
@@ -85,12 +87,11 @@ public class AuthServiceImpl implements AuthService {
             );
         }
 
-        // User entity oluşturulur.
         User user = new User();
         user.setName(request.getName().trim());
         user.setEmail(email);
 
-        // Şifre DB'ye düz metin olarak değil BCrypt hash olarak kaydedilir.
+        // Şifreyi BCrypt ile hashleyerek kaydediyoruz.
         user.setPassword(
                 passwordEncoder.encode(request.getPassword())
         );
@@ -99,7 +100,7 @@ public class AuthServiceImpl implements AuthService {
 
         User savedUser = userRepository.save(user);
 
-        // Role Store ise stores tablosuna da kayıt oluşturulur.
+        // Store kullanıcısıysa mağaza kaydını da oluştur.
         if ("store".equals(role.getCode())) {
 
             Store store = new Store();
@@ -114,5 +115,41 @@ public class AuthServiceImpl implements AuthService {
         }
 
         return savedUser;
+    }
+
+    @Override
+    public LoginResponse login(LoginRequest request) {
+
+        String email = request.getEmail().trim().toLowerCase();
+
+        // Kullanıcı email ile bulunur.
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ApiException(
+                        "Invalid email or password.",
+                        HttpStatus.UNAUTHORIZED
+                ));
+
+        // Girilen şifre BCrypt hash ile karşılaştırılır.
+        if (!passwordEncoder.matches(
+                request.getPassword(),
+                user.getPassword()
+        )) {
+            throw new ApiException(
+                    "Invalid email or password.",
+                    HttpStatus.UNAUTHORIZED
+            );
+        }
+
+        // Kullanıcı doğrulandıktan sonra JWT oluşturulur.
+        String token = jwtService.generateToken(user.getEmail());
+
+        return new LoginResponse(
+                token,
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole().getId(),
+                user.getRole().getName()
+        );
     }
 }

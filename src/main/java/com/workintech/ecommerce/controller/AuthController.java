@@ -1,13 +1,17 @@
 package com.workintech.ecommerce.controller;
 
+import com.workintech.ecommerce.dto.request.LoginRequest;
 import com.workintech.ecommerce.dto.request.SignupRequest;
+import com.workintech.ecommerce.dto.response.LoginResponse;
 import com.workintech.ecommerce.dto.response.UserResponse;
 import com.workintech.ecommerce.entity.User;
 import com.workintech.ecommerce.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class AuthController {
@@ -36,5 +40,15 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(
+            @Valid @RequestBody LoginRequest request
+    ) {
+
+        LoginResponse response = authService.login(request);
+
+        return ResponseEntity.ok(response);
     }
 }
