@@ -8,7 +8,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import java.util.List;
 
 @Configuration
 public class SecurityConfig {
@@ -26,14 +31,18 @@ public class SecurityConfig {
             throws Exception {
 
         http
-                // REST API kullandığımız için CSRF kapalı.
                 .csrf(csrf -> csrf.disable())
 
-                // Form Login ve Basic Auth kullanmıyoruz.
+                .cors(cors ->
+                        cors.configurationSource(
+                                corsConfigurationSource()
+                        )
+                )
+
                 .formLogin(form -> form.disable())
+
                 .httpBasic(basic -> basic.disable())
 
-                // JWT kullandığımız için session tutmuyoruz.
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
@@ -41,24 +50,57 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        // Login gerektirmeyen endpointler.
                         .requestMatchers(
                                 "/roles",
                                 "/signup",
                                 "/login"
                         ).permitAll()
-
-                        // Geri kalan endpointler JWT gerektirir.
                         .anyRequest().authenticated()
                 )
 
-                // JWT filtresi Spring Security filtresinden önce çalışır.
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
                 );
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+
+        CorsConfiguration configuration =
+                new CorsConfiguration();
+
+        configuration.setAllowedOrigins(
+                List.of("http://localhost:5173")
+        );
+
+        configuration.setAllowedMethods(
+                List.of(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "OPTIONS"
+                )
+        );
+
+        configuration.setAllowedHeaders(
+                List.of("*")
+        );
+
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
+        source.registerCorsConfiguration(
+                "/**",
+                configuration
+        );
+
+        return source;
     }
 
     @Bean
