@@ -53,7 +53,9 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/roles",
                                 "/signup",
-                                "/login"
+                                "/login",
+                                "/categories",
+                                "/products/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
