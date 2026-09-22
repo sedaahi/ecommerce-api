@@ -17,6 +17,10 @@ public class OrderItemResponse {
 
     private String name;
 
+    private String description;
+
+    private String image;
+
     private Integer count;
 
     private String detail;

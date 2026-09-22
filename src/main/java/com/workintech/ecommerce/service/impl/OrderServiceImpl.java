@@ -20,12 +20,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class OrderServiceImpl implements OrderService {
+
+    private static final BigDecimal FREE_SHIPPING_LIMIT =
+            new BigDecimal("150.00");
+
+    private static final BigDecimal SHIPPING_PAYMENT =
+            new BigDecimal("29.99");
 
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
@@ -62,6 +69,7 @@ public class OrderServiceImpl implements OrderService {
             OrderRequest request
     ) {
 
+        // 1. Giriş yapan kullanıcıyı bul.
         User user = userRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
@@ -71,7 +79,7 @@ public class OrderServiceImpl implements OrderService {
                         )
                 );
 
-        // Adresin giriş yapan kullanıcıya ait olduğunu doğrular.
+        // 2. Adresin giriş yapan kullanıcıya ait olduğunu doğrula.
         Address address = addressRepository
                 .findByIdAndUserEmail(
                         request.getAddressId(),
@@ -84,8 +92,10 @@ public class OrderServiceImpl implements OrderService {
                         )
                 );
 
+        // 3. Kartın son kullanma tarihini kontrol et.
         validateCardExpiration(request);
 
+        // 4. Order nesnesini hazırla.
         Order order = new Order();
 
         order.setOrderDate(request.getOrderDate());
@@ -96,6 +106,7 @@ public class OrderServiceImpl implements OrderService {
                 request.getCardName().trim()
         );
 
+        // Tam kart numarasını Order tablosunda saklamıyoruz.
         order.setCardLastFour(
                 getLastFourDigits(request.getCardNo())
         );
@@ -108,10 +119,16 @@ public class OrderServiceImpl implements OrderService {
                 request.getCardExpireYear()
         );
 
+        /*
+         * CVV burada bilerek Order entity'sine aktarılmıyor.
+         * CVV veritabanında saklanmamalıdır.
+         */
+
         BigDecimal productsTotal = BigDecimal.ZERO;
 
         List<OrderItem> orderItems = new ArrayList<>();
 
+        // 5. Sepetteki ürünleri kontrol et.
         for (OrderItemRequest itemRequest : request.getProducts()) {
 
             Product product = productRepository
@@ -124,6 +141,7 @@ public class OrderServiceImpl implements OrderService {
                             )
                     );
 
+            // Stok kontrolü.
             if (product.getStock() < itemRequest.getCount()) {
                 throw new ApiException(
                         "Insufficient stock for product: "
@@ -132,6 +150,7 @@ public class OrderServiceImpl implements OrderService {
                 );
             }
 
+            // Fiyat frontend'den değil DB'deki üründen alınır.
             BigDecimal itemTotal = product
                     .getPrice()
                     .multiply(
@@ -150,43 +169,26 @@ public class OrderServiceImpl implements OrderService {
             orderItem.setCount(itemRequest.getCount());
             orderItem.setDetail(itemRequest.getDetail());
 
-            // Sipariş anındaki fiyatı saklarız.
+            // Sipariş anındaki ürün fiyatını sakla.
             orderItem.setUnitPrice(product.getPrice());
 
             orderItems.add(orderItem);
         }
 
-        /*
-         * Frontend tarafından gönderilen toplam fiyatı,
-         * backend'in DB fiyatlarıyla hesapladığı toplamla karşılaştırır.
-         */
-        BigDecimal freeShippingLimit =
-                new BigDecimal("150.00");
-
-        BigDecimal shippingPayment =
-                new BigDecimal("29.99");
-
-        BigDecimal calculatedTotal = productsTotal;
-
-// $150 ve üzerindeki siparişlerde kargo ücretsizdir.
-        if (productsTotal.compareTo(freeShippingLimit) < 0) {
-            calculatedTotal =
-                    calculatedTotal.add(shippingPayment);
-        }
-
-// Para değerlerini 2 ondalık basamakta karşılaştırıyoruz.
-        calculatedTotal =
-                calculatedTotal.setScale(
-                        2,
-                        java.math.RoundingMode.HALF_UP
-                );
+        // 6. Backend tarafında gerçek sipariş toplamını hesapla.
+        BigDecimal calculatedTotal =
+                calculateGrandTotal(productsTotal);
 
         BigDecimal requestedPrice =
                 request.getPrice().setScale(
                         2,
-                        java.math.RoundingMode.HALF_UP
+                        RoundingMode.HALF_UP
                 );
 
+        /*
+         * Frontend'den gelen toplam ile backend'in hesapladığı
+         * toplam aynı değilse siparişi kabul etme.
+         */
         if (calculatedTotal.compareTo(requestedPrice) != 0) {
             throw new ApiException(
                     "Order price does not match calculated price.",
@@ -197,9 +199,7 @@ public class OrderServiceImpl implements OrderService {
         order.setPrice(calculatedTotal);
         order.setProducts(orderItems);
 
-        /*
-         * Tüm kontroller tamamlandıktan sonra stokları azaltıyoruz.
-         */
+        // 7. Tüm kontroller başarılıysa stokları azalt.
         for (OrderItem orderItem : orderItems) {
 
             Product product = orderItem.getProduct();
@@ -212,12 +212,40 @@ public class OrderServiceImpl implements OrderService {
             productRepository.save(product);
         }
 
+        // 8. Cascade sayesinde OrderItem'lar da kaydedilir.
         Order savedOrder =
                 orderRepository.save(order);
 
         return toResponse(savedOrder);
     }
 
+    /*
+     * Frontend OrderSummary ile aynı hesap:
+     *
+     * productsTotal < 150  -> +29.99 shipping
+     * productsTotal >= 150 -> free shipping
+     */
+    private BigDecimal calculateGrandTotal(
+            BigDecimal productsTotal
+    ) {
+
+        BigDecimal grandTotal = productsTotal;
+
+        if (productsTotal.compareTo(FREE_SHIPPING_LIMIT) < 0) {
+            grandTotal =
+                    grandTotal.add(SHIPPING_PAYMENT);
+        }
+
+        return grandTotal.setScale(
+                2,
+                RoundingMode.HALF_UP
+        );
+    }
+
+    /*
+     * Kartın son kullanma ayı geçmişse siparişi reddeder.
+     * Örneğin 09/2026 kartı Eylül 2026 boyunca geçerlidir.
+     */
     private void validateCardExpiration(
             OrderRequest request
     ) {
@@ -246,12 +274,18 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private String getLastFourDigits(String cardNo) {
+    /*
+     * Sipariş kaydında tam kart numarası yerine
+     * yalnızca son 4 haneyi tutuyoruz.
+     */
+    private String getLastFourDigits(
+            String cardNo
+    ) {
 
         String normalizedCardNo =
                 cardNo.replaceAll("\\s+", "");
 
-        if (normalizedCardNo.length() < 4) {
+        if (!normalizedCardNo.matches("\\d{16}")) {
             throw new ApiException(
                     "Invalid card number.",
                     HttpStatus.BAD_REQUEST
@@ -263,20 +297,32 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
+    /*
+     * Entity -> Response DTO dönüşümü.
+     */
     private OrderResponse toResponse(Order order) {
 
         List<OrderItemResponse> products =
                 order.getProducts()
                         .stream()
-                        .map(item ->
-                                new OrderItemResponse(
-                                        item.getProduct().getId(),
-                                        item.getProduct().getName(),
-                                        item.getCount(),
-                                        item.getDetail(),
-                                        item.getUnitPrice()
-                                )
-                        )
+                        .map(item -> {
+
+                            Product product = item.getProduct();
+
+                            String image = product.getImages().isEmpty()
+                                    ? null
+                                    : product.getImages().get(0).getUrl();
+
+                            return new OrderItemResponse(
+                                    product.getId(),
+                                    product.getName(),
+                                    product.getDescription(),
+                                    image,
+                                    item.getCount(),
+                                    item.getDetail(),
+                                    item.getUnitPrice()
+                            );
+                        })
                         .toList();
 
         return new OrderResponse(
