@@ -25,10 +25,8 @@ public class DataInitializer {
     ) {
         return args -> {
 
-            // Sistem rollerini oluşturur.
             initializeRoles(roleRepository);
 
-            // Demo kategori ve ürünleri oluşturur.
             initializeProducts(
                     categoryRepository,
                     productRepository
@@ -67,56 +65,69 @@ public class DataInitializer {
             ProductRepository productRepository
     ) {
 
-        // Seed verileri daha önce eklendiyse tekrar ekleme.
+        // Seed verileri mevcutsa tekrar ekleme.
         if (categoryRepository.count() > 0
                 || productRepository.count() > 0) {
             return;
         }
 
-        Category women = createCategory(
-                "k:giyim",
+        // -------------------------
+        // Categories
+        // -------------------------
+
+        Category womenClothing = createCategory(
+                "k",
+                "giyim",
                 "Women's Clothing",
                 "https://picsum.photos/seed/women-category/600/600",
                 4.9
         );
 
-        Category men = createCategory(
-                "e:giyim",
+        Category menClothing = createCategory(
+                "e",
+                "giyim",
                 "Men's Clothing",
                 "https://picsum.photos/seed/men-category/600/600",
                 4.8
         );
 
-        Category shoes = createCategory(
-                "k:ayakkabi",
-                "Shoes",
+        Category womenShoes = createCategory(
+                "k",
+                "ayakkabi",
+                "Women's Shoes",
                 "https://picsum.photos/seed/shoes-category/600/600",
                 4.7
         );
 
-        Category accessories = createCategory(
-                "k:aksesuar",
-                "Accessories",
+        Category womenAccessories = createCategory(
+                "k",
+                "aksesuar",
+                "Women's Accessories",
                 "https://picsum.photos/seed/accessories-category/600/600",
                 4.6
         );
 
-        Category electronics = createCategory(
-                "e:elektronik",
-                "Electronics",
+        Category menElectronics = createCategory(
+                "e",
+                "elektronik",
+                "Men's Electronics",
                 "https://picsum.photos/seed/electronics-category/600/600",
                 4.5
         );
 
         categoryRepository.saveAll(
                 List.of(
-                        women,
-                        men,
-                        shoes,
-                        accessories,
-                        electronics
+                        womenClothing,
+                        menClothing,
+                        womenShoes,
+                        womenAccessories,
+                        menElectronics
                 )
         );
+
+        // -------------------------
+        // Products
+        // -------------------------
 
         Product tshirt = createProduct(
                 "Classic Cotton T-Shirt",
@@ -125,7 +136,7 @@ public class DataInitializer {
                 25,
                 4.8,
                 145,
-                women
+                womenClothing
         );
 
         addImage(
@@ -140,15 +151,14 @@ public class DataInitializer {
                 1
         );
 
-
         Product jacket = createProduct(
                 "Modern Casual Jacket",
-                "Lightweight casual jacket designed for everyday comfort.",
+                "Modern men's casual jacket suitable for everyday wear.",
                 new BigDecimal("89.99"),
                 15,
                 4.6,
                 98,
-                men
+                menClothing
         );
 
         addImage(
@@ -157,21 +167,14 @@ public class DataInitializer {
                 0
         );
 
-        addImage(
-                jacket,
-                "https://picsum.photos/seed/jacket-2/800/1000",
-                1
-        );
-
-
         Product sneakers = createProduct(
                 "Everyday Sneakers",
-                "Comfortable sneakers suitable for daily use and walking.",
+                "Comfortable women's sneakers suitable for daily use and walking.",
                 new BigDecimal("74.50"),
                 30,
                 4.9,
                 230,
-                shoes
+                womenShoes
         );
 
         addImage(
@@ -186,15 +189,14 @@ public class DataInitializer {
                 1
         );
 
-
         Product bag = createProduct(
                 "Minimal Shoulder Bag",
-                "A compact shoulder bag with a clean and modern design.",
+                "A compact women's shoulder bag with a clean and modern design.",
                 new BigDecimal("54.90"),
                 18,
-                4.5,
-                76,
-                accessories
+                4.7,
+                184,
+                womenAccessories
         );
 
         addImage(
@@ -203,15 +205,14 @@ public class DataInitializer {
                 0
         );
 
-
         Product headphones = createProduct(
                 "Wireless Headphones",
-                "Wireless over-ear headphones with clear sound and comfortable cushions.",
-                new BigDecimal("129.99"),
-                12,
-                4.7,
-                184,
-                electronics
+                "Wireless headphones with clear sound and comfortable ear cushions.",
+                new BigDecimal("99.90"),
+                22,
+                4.5,
+                156,
+                menElectronics
         );
 
         addImage(
@@ -220,15 +221,14 @@ public class DataInitializer {
                 0
         );
 
-
         Product hoodie = createProduct(
                 "Essential Hoodie",
-                "Warm and comfortable hoodie with a relaxed everyday fit.",
-                new BigDecimal("64.99"),
-                20,
-                4.4,
-                67,
-                men
+                "Comfortable men's hoodie with a soft everyday fit.",
+                new BigDecimal("49.99"),
+                28,
+                4.6,
+                112,
+                menClothing
         );
 
         addImage(
@@ -250,6 +250,7 @@ public class DataInitializer {
     }
 
     private Category createCategory(
+            String gender,
             String code,
             String title,
             String img,
@@ -258,6 +259,7 @@ public class DataInitializer {
 
         Category category = new Category();
 
+        category.setGender(gender);
         category.setCode(code);
         category.setTitle(title);
         category.setImg(img);

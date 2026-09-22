@@ -33,6 +33,7 @@ public class CategoryServiceImpl implements CategoryService {
 
         return new CategoryResponse(
                 category.getId(),
+                category.getGender(),
                 category.getCode(),
                 category.getTitle(),
                 category.getImg(),

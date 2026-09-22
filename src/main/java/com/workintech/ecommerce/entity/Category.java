@@ -4,7 +4,14 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "categories")
+@Table(
+        name = "categories",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        columnNames = {"gender", "code"}
+                )
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -15,10 +22,13 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    //k:tshirt
-    //e:ayakkabi için
-    @Column(nullable = false, unique = true)
+    // tshirt, ayakkabi, gomlek...
+    @Column(nullable = false)
     private String code;
+
+    // k = kadın, e = erkek
+    @Column(nullable = false)
+    private String gender;
 
     @Column(nullable = false)
     private String title;

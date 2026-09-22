@@ -11,6 +11,8 @@ public class CategoryResponse {
 
     private Long id;
 
+    private String gender;
+
     private String code;
 
     private String title;
