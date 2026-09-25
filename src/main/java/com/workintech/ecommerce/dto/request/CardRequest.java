@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,12 +24,13 @@ public class CardRequest {
     @JsonProperty("card_no")
     private String cardNo;
 
+    @NotNull(message = "Expire month is required.")
     @Min(value = 1, message = "Expire month must be between 1 and 12.")
     @Max(value = 12, message = "Expire month must be between 1 and 12.")
     @JsonProperty("expire_month")
     private Integer expireMonth;
 
-    @Min(value = 2026, message = "Expire year is invalid.")
+    @NotNull(message = "Expire year is required.")
     @JsonProperty("expire_year")
     private Integer expireYear;
 

@@ -13,7 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-
+import java.time.DateTimeException;
+import java.time.YearMonth;
 @Service
 public class CreditCardServiceImpl implements CreditCardService {
 
@@ -121,11 +122,35 @@ public class CreditCardServiceImpl implements CreditCardService {
 
         creditCardRepository.delete(creditCard);
     }
+    private void validateExpirationDate(CardRequest request) {
+        try {
+            YearMonth expirationDate = YearMonth.of(
+                    request.getExpireYear(),
+                    request.getExpireMonth()
+            );
+
+            YearMonth currentDate = YearMonth.now();
+
+            if (expirationDate.isBefore(currentDate)) {
+                throw new ApiException(
+                        "Card has expired.",
+                        HttpStatus.BAD_REQUEST
+                );
+            }
+        } catch (DateTimeException exception) {
+            throw new ApiException(
+                    "Invalid card expiration date.",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+    }
 
     private void updateCardFields(
             CreditCard creditCard,
             CardRequest request
     ) {
+
+        validateExpirationDate(request);
 
         creditCard.setCardNo(
                 request.getCardNo().trim()
